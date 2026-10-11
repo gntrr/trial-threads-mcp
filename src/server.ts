@@ -12,6 +12,24 @@ const server = Bun.serve({
             });
         }
 
+        if (
+            url.pathname === "/auth/threads/callback" && req.method === "GET"
+        ) {
+            return Response.json(
+                {
+                    status: "callback_ready",
+                    service: "trial-threads-mcp",
+                    oauth: "not_implemented",
+                },
+                {
+                    headers: {
+                        "Cache-Control": "no-store",
+                        "Referrer-Policy": "no-referrer",
+                    },
+                }
+            );
+        }
+
         return new Response("Not Found", { status: 404 });
     },
 });
