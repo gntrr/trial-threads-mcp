@@ -1,3 +1,6 @@
+import { searchThreadsByKeyword } from "./threads/keyword-search";
+import { exchangeLongLivedToken } from "./threads/token";
+
 const redirectUri = process.env.THREADS_REDIRECT_URI;
 const appId = process.env.THREADS_APP_ID;
 
@@ -170,40 +173,27 @@ const server = Bun.serve({
                     result.access_token &&
                     grantedScopes?.includes("threads_keyword_search")
                 ) {
+                    keywordSearchCheck = await searchThreadsByKeyword(
+                        result.access_token,
+                        "website"
+                    );
+                }
+
+                let longLivedCheck = {
+                    status: "not_tested",
+                    httpStatus: null as number | null,
+                    expiresInSeconds: null as number | null,
+                    errorCode: null as number | null,
+                };
+
+                if (response.ok && result.access_token) {
                     try {
-                        const searchUrl = new URL(
-                            "https://graph.threads.net/v1.0/keyword_search"
+                        longLivedCheck = await exchangeLongLivedToken(
+                        result.access_token,
+                        appSecret
                         );
-
-                        searchUrl.searchParams.set("q", "website");
-                        searchUrl.searchParams.set("search_type", "RECENT");
-                        searchUrl.searchParams.set(
-                            "fields",
-                            "id,text,username,permalink,timestamp"
-                        );
-                        searchUrl.searchParams.set("limit", "5");
-
-                        const searchResponse = await fetch(searchUrl, {
-                            headers: {
-                                Authorization: `Bearer ${result.access_token}`,
-                            },
-                        });
-
-                        const searchResult = (await searchResponse.json()) as {
-                            data?: Array<{ id: string }>;
-                            error?: { code?: number };
-                        };
-
-                        keywordSearchCheck = {
-                            status: searchResponse.ok ? "success" : "api_error",
-                            httpStatus: searchResponse.status,
-                            resultCount: Array.isArray(searchResult.data)
-                                ? searchResult.data.length
-                                : null,
-                            errorCode: searchResult.error?.code ?? null,
-                        };
                     } catch {
-                        keywordSearchCheck.status = "network_error";
+                        longLivedCheck.status = "request_failed";
                     }
                 }
 
@@ -228,6 +218,7 @@ const server = Bun.serve({
                         },
 
                         keywordSearchCheck,
+                        longLivedCheck,
                     },
                     {
                         status: response.ok && result.access_token ? 200 : 502,
