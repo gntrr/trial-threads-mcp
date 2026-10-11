@@ -1,8 +1,39 @@
 import { searchThreadsByKeyword } from "./threads/keyword-search";
 import { exchangeLongLivedToken } from "./threads/token";
+import { timingSafeEqual } from "node:crypto";
 
 const redirectUri = process.env.THREADS_REDIRECT_URI;
 const appId = process.env.THREADS_APP_ID;
+
+function isAdminAuthorized(req: Request): boolean {
+    const expectedPassword =
+        process.env.THREADS_OAUTH_ADMIN_PASSWORD;
+
+    if (!expectedPassword) return false;
+
+    const authorization = req.headers.get("authorization");
+
+    if (!authorization?.startsWith("Basic ")) {
+        return false;
+    }
+
+    const decoded = Buffer.from(
+        authorization.slice(6),
+        "base64"
+    ).toString("utf8");
+
+    if (!decoded.startsWith("admin:")) {
+        return false;
+    }
+
+    const password = Buffer.from(decoded.slice(6));
+    const expected = Buffer.from(expectedPassword);
+
+    return (
+        password.length === expected.length &&
+        timingSafeEqual(password, expected)
+    );
+}
 
 const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -19,7 +50,26 @@ const server = Bun.serve({
         }
 
         // Step 1: Start OAuth
-        if (url.pathname === "/auth/threads/login") {
+        if (
+            url.pathname === "/auth/threads/login" &&
+            req.method === "GET"
+        ) {
+            if (!process.env.THREADS_OAUTH_ADMIN_PASSWORD) {
+                return new Response("Admin authentication not configured", {
+                    status: 503,
+                });
+            }
+
+            if (!isAdminAuthorized(req)) {
+                return new Response("Unauthorized", {
+                    status: 401,
+                    headers: {
+                        "WWW-Authenticate": 'Basic realm="Threads MCP Admin"',
+                        "Cache-Control": "no-store",
+                    },
+                });
+            }
+
             if (!appId || !redirectUri) {
                 return new Response("OAuth configuration is missing", {
                     status: 500,
