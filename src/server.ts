@@ -159,6 +159,54 @@ const server = Bun.serve({
                     }
                 }
 
+                let keywordSearchCheck = {
+                    status: "not_tested",
+                    httpStatus: null as number | null,
+                    resultCount: null as number | null,
+                    errorCode: null as number | null,
+                };
+
+                if (
+                    result.access_token &&
+                    grantedScopes?.includes("threads_keyword_search")
+                ) {
+                    try {
+                        const searchUrl = new URL(
+                            "https://graph.threads.net/v1.0/keyword_search"
+                        );
+
+                        searchUrl.searchParams.set("q", "website");
+                        searchUrl.searchParams.set("search_type", "RECENT");
+                        searchUrl.searchParams.set(
+                            "fields",
+                            "id,text,username,permalink,timestamp"
+                        );
+                        searchUrl.searchParams.set("limit", "5");
+
+                        const searchResponse = await fetch(searchUrl, {
+                            headers: {
+                                Authorization: `Bearer ${result.access_token}`,
+                            },
+                        });
+
+                        const searchResult = (await searchResponse.json()) as {
+                            data?: Array<{ id: string }>;
+                            error?: { code?: number };
+                        };
+
+                        keywordSearchCheck = {
+                            status: searchResponse.ok ? "success" : "api_error",
+                            httpStatus: searchResponse.status,
+                            resultCount: Array.isArray(searchResult.data)
+                                ? searchResult.data.length
+                                : null,
+                            errorCode: searchResult.error?.code ?? null,
+                        };
+                    } catch {
+                        keywordSearchCheck.status = "network_error";
+                    }
+                }
+
                 return Response.json(
                     {
                         status: 
@@ -177,7 +225,9 @@ const server = Bun.serve({
                             grantedScopes,
                             keywordSearchGranted:
                                 grantedScopes?.includes("threads_keyword_search") ?? null,
-                        }
+                        },
+
+                        keywordSearchCheck,
                     },
                     {
                         status: response.ok && result.access_token ? 200 : 502,
