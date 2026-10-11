@@ -117,16 +117,67 @@ const server = Bun.serve({
                     error?: { code?: number };
                 };
 
+                let grantedScopes: string[] | null = null;
+                let tokenValid: boolean | null = null;
+                let debugStatus = "not_checked";
+
+                if (response.ok && result.access_token) {
+                    try {
+                        const debugUrl = new URL(
+                            "https://graph.threads.net/debug_token"
+                        );
+
+                        debugUrl.searchParams.set(
+                            "input_token",
+                            result.access_token
+                        );
+
+                        const debugResponse = await fetch(debugUrl, {
+                            headers: {
+                                Authorization: `Bearer ${result.access_token}`,
+                            },
+                        });
+
+                        if (debugResponse.ok) {
+                            const debugResult = (await debugResponse.json()) as {
+                                data?: {
+                                    is_valid?: boolean;
+                                    scopes?: string[];
+                                };
+                            };
+
+                            grantedScopes = debugResult.data?.scopes ?? null;
+                            tokenValid = debugResult.data?.is_valid ?? null;
+                            debugStatus = grantedScopes
+                                ? "success"
+                                : "scopes_unavailable";
+                        } else {
+                            debugStatus = `http_${debugResponse.status}`;
+                        }
+                    } catch {
+                        debugStatus = "request_failed";
+                    }
+                }
+
                 return Response.json(
                     {
                         status: 
                             response.ok && result.access_token
                                 ? "token_exchange_success"
                                 : "token_exchange_failed",
+
                         metaHttpStatus: response.status,
                         metaErrorCode: result.error?.code ?? null,
                         tokenReceived: Boolean(result.access_token),
                         tokenStored: false,
+
+                        permissionCheck: {
+                            status: debugStatus,
+                            tokenValid,
+                            grantedScopes,
+                            keywordSearchGranted:
+                                grantedScopes?.includes("threads_keyword_search") ?? null,
+                        }
                     },
                     {
                         status: response.ok && result.access_token ? 200 : 502,
