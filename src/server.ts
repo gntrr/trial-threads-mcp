@@ -29,7 +29,7 @@ const server = Bun.serve({
             
             authorizeUrl.searchParams.set("client_id", appId);
             authorizeUrl.searchParams.set("redirect_uri", redirectUri);
-            authorizeUrl.searchParams.set("scope", "user_profile,user_media,threads_basic");
+            authorizeUrl.searchParams.set("scope", "threads_keyword_search,threads_manage_insights,threads_basic");
             authorizeUrl.searchParams.set("response_type", "code");
             authorizeUrl.searchParams.set("state", state);
 
