@@ -1,6 +1,7 @@
 import { searchThreadsByKeyword } from "./threads/keyword-search";
 import { exchangeLongLivedToken } from "./threads/token";
 import { timingSafeEqual } from "node:crypto";
+import { verifyThreadsAccount } from "./threads/verify-account";
 
 const redirectUri = process.env.THREADS_REDIRECT_URI;
 const appId = process.env.THREADS_APP_ID;
@@ -169,6 +170,35 @@ const server = Bun.serve({
                     user_id?: number;
                     error?: { code?: number };
                 };
+
+                if (response.ok && result.access_token) {
+                    if (!process.env.THREADS_ALLOWED_USER_ID) {
+                        return Response.json(
+                            { status: "account_verification_not_configured" },
+                            { status: 503, headers }
+                        );
+                    }
+
+                    let isAllowedAccount: boolean;
+
+                    try {
+                        isAllowedAccount = await verifyThreadsAccount(
+                            result.access_token
+                        );
+                    } catch {
+                        return Response.json(
+                            { status: "account_verification_failed" },
+                            { status: 502, headers }
+                        );
+                    }
+
+                    if (!isAllowedAccount) {
+                        return Response.json(
+                            { status: "account_not_allowed" },
+                            { status: 403, headers }
+                        );
+                    }
+                }
 
                 let grantedScopes: string[] | null = null;
                 let tokenValid: boolean | null = null;
