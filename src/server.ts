@@ -5,7 +5,7 @@ const server = Bun.serve({
     hostname: "127.0.0.1",
     port: Number(process.env.PORT ?? 3000),
 
-    fetch(req) {
+    async fetch(req) {
         const url = new URL(req.url);
 
         if(url.pathname === "/health" && req.method === "GET") {
@@ -69,22 +69,76 @@ const server = Bun.serve({
             }
 
             const code = url.searchParams.get("code");
+            const appId = process.env.THREADS_APP_ID;
+            const appSecret = process.env.THREADS_APP_SECRET;
+            const redirectUri = process.env.THREADS_REDIRECT_URI;
 
-            return Response.json(
-                {
-                    status: code ? "code_received" : "authorization_failed",
-                    codeReceived: Boolean(code),
-                    oauth: "token_exchange_not_implemented",
-                },
-                {
-                    headers: {
-                        "Cache-Control": "no-store",
-                        "Referrer-Policy": "no-referrer",
-                        "Set-Cookie": 
-                            "threads_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/auth/threads; Max-Age=0",
+            const headers = {
+                "Cache-Control": "no-store",
+                "Referrer-Policy": "no-referrer",
+                "Set-Cookie": 
+                    "threads_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/auth/threads; Max-Age=0",
+            };
+
+            if (!code) {
+                return Response.json(
+                    { status: "authorization_failed" },
+                    { status: 400, headers }
+                );
+            }
+
+            if (!appId || !appSecret || !redirectUri) {
+                return Response.json(
+                    { error: "OAuth configuration is missing" },
+                    { status: 500, headers }
+                );
+            }
+
+            try {
+                const response = await fetch("https://graph.threads.net/oauth/access_token",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded",
+                        },
+                        body: new URLSearchParams({
+                            client_id: appId,
+                            client_secret: appSecret,
+                            grant_type: "authorization_code",
+                            redirect_uri: redirectUri,
+                            code,
+                        }),
+                    }
+                );
+
+                const result = (await response.json()) as {
+                    access_token?: string;
+                    user_id?: number;
+                    error?: { code?: number };
+                };
+
+                return Response.json(
+                    {
+                        status: 
+                            response.ok && result.access_token
+                                ? "token_exchange_success"
+                                : "token_exchange_failed",
+                        metaHttpStatus: response.status,
+                        metaErrorCode: result.error?.code ?? null,
+                        tokenReceived: Boolean(result.access_token),
+                        tokenStored: false,
                     },
-                }
-            );
+                    {
+                        status: response.ok && result.access_token ? 200 : 502,
+                        headers,
+                    }
+                );
+            } catch {
+                return Response.json(
+                    { status: "token_exchange_error" },
+                    { status: 502, headers }
+                );
+            }
         }
 
         return new Response("Not Found", { status: 404 });
