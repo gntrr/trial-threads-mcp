@@ -1,5 +1,5 @@
 import { searchThreadsByKeyword } from "./threads/keyword-search";
-import { exchangeLongLivedToken } from "./threads/token";
+import { exchangeAndStoreLongLivedToken } from "./threads/token";
 import { timingSafeEqual } from "node:crypto";
 import { verifyThreadsAccount } from "./threads/verify-account";
 
@@ -268,16 +268,18 @@ const server = Bun.serve({
                     httpStatus: null as number | null,
                     expiresInSeconds: null as number | null,
                     errorCode: null as number | null,
+                    tokenStored: false,
                 };
 
-                if (response.ok && result.access_token) {
+                if (response.ok && result.access_token && accountVerified) {
                     try {
-                        longLivedCheck = await exchangeLongLivedToken(
-                        result.access_token,
-                        appSecret
+                        longLivedCheck = await exchangeAndStoreLongLivedToken(
+                          result.access_token,
+                          appSecret,
+                          process.env.THREADS_ALLOWED_USER_ID!
                         );
                     } catch {
-                        longLivedCheck.status = "request_failed";
+                        longLivedCheck.status = "request_or_storage_failed";
                     }
                 }
 
@@ -291,7 +293,7 @@ const server = Bun.serve({
                         metaHttpStatus: response.status,
                         metaErrorCode: result.error?.code ?? null,
                         tokenReceived: Boolean(result.access_token),
-                        tokenStored: false,
+                        tokenStored: longLivedCheck.tokenStored,
 
                         permissionCheck: {
                             status: debugStatus,
