@@ -80,7 +80,7 @@ const server = Bun.serve({
             const state = crypto.randomUUID();
 
             const authorizeUrl = new URL("https://www.threads.net/oauth/authorize");
-            
+
             authorizeUrl.searchParams.set("client_id", appId);
             authorizeUrl.searchParams.set("redirect_uri", redirectUri);
             authorizeUrl.searchParams.set("scope", "threads_keyword_search,threads_manage_insights,threads_basic");
@@ -130,7 +130,7 @@ const server = Bun.serve({
             const headers = {
                 "Cache-Control": "no-store",
                 "Referrer-Policy": "no-referrer",
-                "Set-Cookie": 
+                "Set-Cookie":
                     "threads_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/auth/threads; Max-Age=0",
             };
 
@@ -171,6 +171,8 @@ const server = Bun.serve({
                     error?: { code?: number };
                 };
 
+                let accountVerified = false;
+
                 if (response.ok && result.access_token) {
                     if (!process.env.THREADS_ALLOWED_USER_ID) {
                         return Response.json(
@@ -198,6 +200,8 @@ const server = Bun.serve({
                             { status: 403, headers }
                         );
                     }
+
+                    accountVerified = true;
                 }
 
                 let grantedScopes: string[] | null = null;
@@ -279,7 +283,7 @@ const server = Bun.serve({
 
                 return Response.json(
                     {
-                        status: 
+                        status:
                             response.ok && result.access_token
                                 ? "token_exchange_success"
                                 : "token_exchange_failed",
@@ -299,6 +303,7 @@ const server = Bun.serve({
 
                         keywordSearchCheck,
                         longLivedCheck,
+                        accountVerified,
                     },
                     {
                         status: response.ok && result.access_token ? 200 : 502,
