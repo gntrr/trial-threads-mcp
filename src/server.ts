@@ -4,6 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import { verifyThreadsAccount } from "./threads/verify-account";
 import { refreshStoredThreadsToken } from "./threads/token-refresh";
 import { withRedisLock } from "./lib/redis-lock";
+import { handleMcpRequest } from "./mcp/http";
 
 const redirectUri = process.env.THREADS_REDIRECT_URI;
 const appId = process.env.THREADS_APP_ID;
@@ -358,6 +359,11 @@ const server = Bun.serve({
           },
         );
       }
+    }
+
+    // Private MCP endpoint
+    if (url.pathname === "/mcp") {
+      return handleMcpRequest(req);
     }
 
     return new Response("Not Found", { status: 404 });
