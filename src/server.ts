@@ -361,6 +361,36 @@ const server = Bun.serve({
       }
     }
 
+    // MCP OAuth Protected Resource Metadata
+    if (
+      req.method === "GET" &&
+      (url.pathname === "/.well-known/oauth-protected-resource" ||
+        url.pathname === "/.well-known/oauth-protected-resource/mcp")
+    ) {
+      const issuer = process.env.AUTH0_ISSUER;
+      const resource = process.env.AUTH0_AUDIENCE;
+
+      if (!issuer || !resource) {
+        return Response.json(
+          { error: "OAuth discovery not configured" },
+          { status: 503 },
+        );
+      }
+
+      return Response.json(
+        {
+          resource,
+          authorization_servers: [issuer],
+          scopes_supported: ["search:threads"],
+        },
+        {
+          headers: {
+            "Cache-Control": "public, max-age=300",
+          },
+        },
+      );
+    }
+
     // Private MCP endpoint
     if (url.pathname === "/mcp") {
       return handleMcpRequest(req);
