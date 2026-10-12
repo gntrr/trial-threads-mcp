@@ -69,5 +69,6 @@ export async function getThreadsToken(
         userId: stored.userId,
         accessToken: decryptToken(stored.encryptedToken),
         expiresAt: stored.expiresAt,
+        updatedAt: stored.updatedAt,
     };
 }

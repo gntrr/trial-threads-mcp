@@ -1,5 +1,11 @@
 {
     "$schema": "https://openapi.vercel.sh/vercel.json",
     "bunVersion": "1.x",
-    "devCommand": "bun run src/server.ts"
+    "devCommand": "bun run src/server.ts",
+    "crons": [
+      {
+        "path": "/api/cron/refresh-token",
+        "schedule": "0 2 * * *"
+      }
+    ]
 }
