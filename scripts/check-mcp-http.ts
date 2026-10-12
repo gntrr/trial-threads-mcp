@@ -14,8 +14,10 @@ const client = new Client({
   version: "1.0.0",
 });
 
+const mcpUrl = process.env.MCP_URL ?? "http://localhost:3000/mcp";
+
 const transport = new StreamableHTTPClientTransport(
-  new URL("http://localhost:3000/mcp"),
+  new URL(mcpUrl),
   {
     fetch: (url, init) => {
       const headers = new Headers(init?.headers);
